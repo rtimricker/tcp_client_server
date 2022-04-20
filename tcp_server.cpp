@@ -1,7 +1,7 @@
 //Example code: A simple server side code, which echos back the received message.
 //Handle multiple socket connections with select and fd_set on Linux
 #include <stdio.h>
-#include <string.h> //strlen
+//#include <string.h> //strlen
 #include <stdlib.h>
 #include <errno.h>
 #include <unistd.h> //close
@@ -11,6 +11,13 @@
 #include <netinet/in.h>
 #include <sys/time.h> //FD_SET, FD_ISSET, FD_ZERO macros
 	
+#include <iostream>
+#include <string>
+#include <cstring>
+#include <algorithm>
+
+using namespace std;
+		
 #define TRUE 1
 #define FALSE 0
 //#define PORT 8888
@@ -176,7 +183,26 @@ int main(int argc , char *argv[])
 					//set the string terminating NULL byte on the end
 					//of the data read
 					buffer[valread] = '\0';
-					send(sd , buffer , strlen(buffer) , 0 );
+					//send(sd , buffer , strlen(buffer) , 0 );
+					
+					cout << "buffer from client: " << buffer << endl;
+					
+					// ----------
+					// rtr - added: On receipt of a "Close" close/disconnect this active socket.
+					// turn buffer to lower case...
+					string msg(buffer);
+					transform(msg.begin(), msg.end(), msg.begin(), ::tolower);
+					if (msg.compare(0, msg.length() - 1, "close") == 0) {
+						printf("Host disconnected , ip %s , port %d \n" ,
+							inet_ntoa(address.sin_addr) , ntohs(address.sin_port));
+						//Close the socket and mark as 0 in list for reuse
+						close( sd );
+						client_socket[i] = 0;
+					} else {
+						buffer[valread] = '\0';
+						send(sd , buffer , strlen(buffer) , 0 );
+					}				
+					// ----------
 				}
 			}
 		}

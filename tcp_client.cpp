@@ -8,6 +8,16 @@
 #include <unistd.h> //close
 #include <arpa/inet.h> //close
 
+#include <iostream>
+#include <string>
+#include <cstring>
+#include <algorithm>
+
+#include <chrono>
+#include <ctime>
+
+using namespace std;
+
 #define MAX 80
 #define PORT 5000 
 #define SA struct sockaddr
@@ -25,6 +35,25 @@
 #include <sys/time.h> //FD_SET, FD_ISSET, FD_ZERO macros
 */
 
+#if 0
+void * heartBeat(void * arg)
+{
+	int sockfd = *(int *) arg;
+
+	for (;;) {
+		//pthread_mutex_lock(&mutex);
+		int ret = write(sockfd, "heartBeat", 9);
+		//pthread_mutex_lock(&mutex);
+
+		cout << "\n==> in thread loop, write ret: " << ret << endl;
+
+		cout.flush();
+		usleep(15 * 1000000);
+	}
+	return (void*)nullptr;	
+}
+#endif
+
 void func(int sockfd)
 {
 	char buff[MAX];
@@ -36,6 +65,17 @@ void func(int sockfd)
 		while ((buff[n++] = getchar()) != '\n')
 			;
 		write(sockfd, buff, sizeof(buff));
+		// ----------
+		// rtr - added 
+		// "Close" the current active connection
+		//
+		string msg(buff);
+		transform(msg.begin(), msg.end(), msg.begin(), ::tolower);
+		if (msg.compare(0, msg.length() - 1, "close") == 0) {
+			break;
+		}
+		//
+		// ----------
 		bzero(buff, sizeof(buff));
 		read(sockfd, buff, sizeof(buff));
 		printf("From Server : %s", buff);
@@ -74,6 +114,25 @@ int main()
 	else
 		printf("connected to the server..\n");
 
+#if 0
+	// -----
+	// rtr - start timer thread
+	cout << "----- start timer -----" << endl;
+	cout.flush();
+	int i(0);
+	pthread_t threads[i];
+        if (pthread_create(&threads[0], NULL, &heartBeat, &sockfd)) {
+            cout << "Error in thread creation: " << endl;
+	    close(sockfd);
+	    exit(1);
+        }
+	cout << "thread created" << endl;
+	cout.flush();
+sleep(5000000);
+
+	// -----
+#endif
+	
 	// function for chat
 	func(sockfd);
 
