@@ -1,8 +1,14 @@
 
 
-#all: tcp_server.cpp tcp_client.coo
+all: tcp_client.cpp tcp_server.cpp tcp_server tcp_client Makefile
 
-server: tcp_server.cpp
+tcp_server: _server.orig.cpp Makefile
 	g++ -o tcp_server tcp_server.cpp -lpthread
-client: tcp_client.cpp
+
+tcp_client: _client.orig.cpp Makefile
 	g++ -o tcp_client tcp_client.cpp -lpthread
+
+
+clean:
+	rm tcp_server
+	rm tcp_client

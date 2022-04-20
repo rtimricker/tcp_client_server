@@ -1,74 +1,83 @@
 
-#include <iostream>
-#include <boost/array.hpp>
-#include <boost/asio.hpp>
+#include <netdb.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <sys/socket.h>
+#include <errno.h>
+#include <unistd.h> //close
+#include <arpa/inet.h> //close
 
-using boost::asio::ip::tcp;
+#define MAX 80
+#define PORT 5000 
+#define SA struct sockaddr
 
-int main(int argc, char* argv[])
+/*
+//#include <stdio.h>
+//#include <string.h> //strlen
+//#include <stdlib.h>
+#include <errno.h>
+#include <unistd.h> //close
+#include <arpa/inet.h> //close
+#include <sys/types.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <sys/time.h> //FD_SET, FD_ISSET, FD_ZERO macros
+*/
+
+void func(int sockfd)
 {
-  try
-  {
-    // the user should specify the server - the 2nd argument
-    if (argc != 2)
-    {
-      std::cerr << "Usage: client " << std::endl;
-      return 1;
-    }
+	char buff[MAX];
+	int n;
+	for (;;) {
+		bzero(buff, sizeof(buff));
+		printf("Enter the string : ");
+		n = 0;
+		while ((buff[n++] = getchar()) != '\n')
+			;
+		write(sockfd, buff, sizeof(buff));
+		bzero(buff, sizeof(buff));
+		read(sockfd, buff, sizeof(buff));
+		printf("From Server : %s", buff);
+		if ((strncmp(buff, "exit", 4)) == 0) {
+			printf("Client Exit...\n");
+			break;
+		}
+	}
+}
 
-    // Any program that uses asio need to have at least one io_service object
-    boost::asio::io_service io_service;
+int main()
+{
+	int sockfd, connfd;
+	struct sockaddr_in servaddr, cli;
 
-    // Convert the server name that was specified as a parameter to the application, to a TCP endpoint.
-    // To do this, we use an ip::tcp::resolver object.
-    tcp::resolver resolver(io_service);
+	// socket create and verification
+	sockfd = socket(AF_INET, SOCK_STREAM, 0);
+	if (sockfd == -1) {
+		printf("socket creation failed...\n");
+		exit(0);
+	}
+	else
+		printf("Socket successfully created..\n");
+	bzero(&servaddr, sizeof(servaddr));
 
-    // A resolver takes a query object and turns it into a list of endpoints.
-    // We construct a query using the name of the server, specified in argv[1],
-    // and the name of the service, in this case "daytime".
-    tcp::resolver::query query(argv[1], "daytime");
+	// assign IP, PORT
+	servaddr.sin_family = AF_INET;
+	servaddr.sin_addr.s_addr = inet_addr("127.0.0.1");
+	servaddr.sin_port = htons(PORT);
 
-    // The list of endpoints is returned using an iterator of type ip::tcp::resolver::iterator.
-    // A default constructed ip::tcp::resolver::iterator object can be used as an end iterator.
-    tcp::resolver::iterator endpoint_iterator = resolver.resolve(query);
+	// connect the client socket to server socket
+	if (connect(sockfd, (SA*)&servaddr, sizeof(servaddr)) != 0) {
+		printf("connection with the server failed...\n");
+		exit(0);
+	}
+	else
+		printf("connected to the server..\n");
 
-    // Now we create and connect the socket.
-    // The list of endpoints obtained above may contain both IPv4 and IPv6 endpoints,
-    // so we need to try each of them until we find one that works.
-    // This keeps the client program independent of a specific IP version.
-    // The boost::asio::connect() function does this for us automatically.
-    tcp::socket socket(io_service);
-    boost::asio::connect(socket, endpoint_iterator);
+	// function for chat
+	func(sockfd);
 
-    // The connection is open. All we need to do now is read the response from the daytime service.
-    for (;;)
-    {
-      // We use a boost::array to hold the received data.
-      //boost::array buf;
-      boost::array<char, 512> buf;
-      boost::system::error_code error;
-
-      // The boost::asio::buffer() function automatically determines
-      // the size of the array to help prevent buffer overruns.
-      size_t len = socket.read_some(boost::asio::buffer(buf), error);
-
-      // When the server closes the connection,
-      // the ip::tcp::socket::read_some() function will exit with the boost::asio::error::eof error,
-      // which is how we know to exit the loop.
-      if (error == boost::asio::error::eof)
-        break; // Connection closed cleanly by peer.
-      else if (error)
-        throw boost::system::system_error(error); // Some other error.
-
-      std::cout.write(buf.data(), len);
-    }
-  }
-  // handle any exceptions that may have been thrown.
-  catch (std::exception& e)
-  {
-    std::cerr << e.what() << std::endl;
-  }
-
-  return 0;
+	// close the socket
+	close(sockfd);
 }
 
