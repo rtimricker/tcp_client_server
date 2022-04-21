@@ -40,14 +40,12 @@ int main(int argc , char *argv[])
 	const char * message = "ECHO Daemon v1.0 \r\n";
 	
 	//initialise all client_socket[] to 0 so not checked
-	for (i = 0; i < max_clients; i++)
-	{
+	for (i = 0; i < max_clients; i++) {
 		client_socket[i] = 0;
 	}
 		
 	//create a master socket
-	if( (master_socket = socket(AF_INET , SOCK_STREAM , 0)) == 0)
-	{
+	if( (master_socket = socket(AF_INET , SOCK_STREAM , 0)) == 0) {
 		perror("socket failed");
 		exit(EXIT_FAILURE);
 	}
@@ -55,7 +53,7 @@ int main(int argc , char *argv[])
 	//set master socket to allow multiple connections ,
 	//this is just a good habit, it will work without this
 	if( setsockopt(master_socket, SOL_SOCKET, SO_REUSEADDR, (char *)&opt,
-		sizeof(opt)) < 0 )
+		sizeof(opt)) < 0 
 	{
 		perror("setsockopt");
 		exit(EXIT_FAILURE);
@@ -134,8 +132,7 @@ int main(int argc , char *argv[])
 			new_socket , inet_ntoa(address.sin_addr) , ntohs(address.sin_port));
 		
 			//send new connection greeting message
-			if( send(new_socket, message, strlen(message), 0) != strlen(message) )
-			{
+			if( send(new_socket, message, strlen(message), 0) != strlen(message) ) {
 				perror("send");
 			}
 				
@@ -185,7 +182,7 @@ int main(int argc , char *argv[])
 					buffer[valread] = '\0';
 					//send(sd , buffer , strlen(buffer) , 0 );
 					
-					cout << "buffer from client: " << buffer << endl;
+					cout << "buffer from client: " << buffer;
 					
 					// ----------
 					// rtr - added: On receipt of a "Close" close/disconnect this active socket.
@@ -198,9 +195,35 @@ int main(int argc , char *argv[])
 						//Close the socket and mark as 0 in list for reuse
 						close( sd );
 						client_socket[i] = 0;
+					} else if (msg.compare(0, msg.length() - 1, "exit") == 0) {
+						printf("Host disconnected , ip %s , port %d \n" ,
+							inet_ntoa(address.sin_addr) , ntohs(address.sin_port));
+						//Close the socket and mark as 0 in list for reuse
+						cout << "send message to client of fd: " << sd;
+						send(sd, msg.c_str(), msg.length(), 0 );
+						close( sd );
+						client_socket[i] = 0;
+						//Close socket(s) and mark as 0 in list
+					return 1;
+#if 0
+						cout << "exiting all ..." << endl;
+						for (int idx = 0; idx < max_clients; idx++) {
+							int _sd = client_socket[idx];
+							//cout << "idx: " << idx << " _sd: " << _sd << endl;
+							if (_sd) {
+								//buffer[valread] = '\0';
+								// send to other clients, let each close their socket
+								cout << "send msg to _sd: " << _sd << endl;
+								send(_sd , msg.c_str(), msg.length(), 0 );
+								close( _sd );	
+								client_socket[idx] = 0;
+							}
+						}
+				//return 1;
+#endif
 					} else {
 						buffer[valread] = '\0';
-						send(sd , buffer , strlen(buffer) , 0 );
+						send(sd , buffer , strlen(buffer) , 0 );
 					}				
 					// ----------
 				}
