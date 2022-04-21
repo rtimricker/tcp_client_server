@@ -38,18 +38,26 @@ using namespace std;
 int read_thread_on(1);
 int write_thread_on(1);
 
-#if 0
+struct kick;		// prototype
+struct kick {
+	kick()
+	{
+	}
+	char buff[MAX];
+	int port;
+	int sockfd;
+};
+
+#if 1
 void * heartBeat(void * arg)
 {
 	int sockfd = *(int *) arg;
-
-	//for (;;) {
 	while (write_thread_on || read_thread_on) {
-		//pthread_mutex_lock(&mutex);
-		int ret = write(sockfd, "heartBeat", 9);
-		//pthread_mutex_lock(&mutex);
+		int ret = write(sockfd, "heartBeat\n", 10);
+		cout << "write: heartBeat to sockfd: " << sockfd << endl;
 
-		cout << "\n==> in thread loop, write ret: " << ret << endl;
+		//cout << "==> in thread loop, write: [" << msg.c_str() << "] " << "ret: " << ret << endl;
+		cout << "==> in thread loop, write: [" << heartBeat << "] sockfd: " << sockfd << " ret: " << ret << endl;
 
 		cout.flush();
 		usleep(15 * 1000000);
@@ -67,7 +75,8 @@ void * read (void * arg)
 	while (read_thread_on) {
 		bzero(buff, sizeof(buff));
 		read(sockfd, buff, sizeof(buff));
-		printf("From Server : %s", buff);
+		string msg(buff);
+		cout << "...From Server : " << msg.c_str() << "sockfd: " << sockfd;
 		if ((strncmp(buff, "exit", 4)) == 0) {
 			printf("Client Exit...\n");
 			read_thread_on = 0;
@@ -90,15 +99,19 @@ void * write(void * arg)
 		n = 0;
 		while ((buff[n++] = getchar()) != '\n')
 			;
-		write(sockfd, buff, sizeof(buff));
+		cout << "n: " << n << " strlen(buff): " << strlen(buff) << endl;
+		string msg(buff);
+		write(sockfd, msg.c_str(), msg.length());
+		//write(sockfd, buff, sizeof(buff));
+		cout << "write: " << buff << " to sockfd: " << sockfd << " length: " << strlen(buff) <<  endl;
 
 		// ----------
 		// rtr - added 
 		// "Close" the current active connection
 		// "Exit" the app
 		//
-		string msg(buff);
-		cout << "wrote to server: " << msg.c_str();
+//		string msg(buff);
+//		cout << "wrote to server: " << msg.c_str();
 		transform(msg.begin(), msg.end(), msg.begin(), ::tolower);
 		if (msg.compare(0, msg.length() - 1, "close") == 0) {
 			cout << "msg: " << msg.c_str();
@@ -158,21 +171,24 @@ int main()
 	}
 	
 	pthread_t threads[3];
-#if 0
+	int i(0);
+#if 1
 	// -----
 	// rtr - start timer thread
 	cout << "----- start timer -----" << endl;
 	cout.flush();
-	int i(0);
-	pthread_t threads[3];
+//	struct kick _kick;
+//	_kick.sockfd = sockfd;
+//	_kick.port = PORT;
+
+
     if (pthread_create(&threads[0], NULL, &heartBeat, &sockfd)) {
-        cout << "Error in thread creation of heartBeat " << endl;
+//    strncpy(_kick.buff, "heartBeat\n", 10);
+//    if (pthread_create(&threads[0], NULL, &heartBeat, &_kick)) {
+        cout << "Error in thread creation of heartBeat, sockfd: " << sockfd << endl;
 	    close(sockfd);
 	    exit(1);
     }
-	while (write_thread_on && read_thread_on) {
-		sleep(.5);
-	}
 	cout << "heartBeat thread created" << endl;
 	cout.flush();
 //sleep(5000000);
@@ -187,7 +203,7 @@ int main()
 	// rtr - have keyboard input in background to allow for server talking to client.
 	//
     if (pthread_create(&threads[1], NULL, &write, &sockfd)) {
-        cout << "Error in thread creation of write()" << endl;
+        cout << "Error in thread creation of write(), sockfd: " << sockfd << endl;
 	    close(sockfd);
 	    exit(1);
     }
@@ -200,9 +216,6 @@ int main()
 	cout << "wait for exiting write_thread_on: " << write_thread_on << endl;
 	cout.flush();
 
-//	while (!write_thread_on) {
-//		sleep(1);
-//	}
 
 	while (write_thread_on) {
 		sleep(1);
@@ -214,7 +227,7 @@ int main()
 	// ----------
 	// rtr - have keyboard input in background
 	//
-:wait    if (pthread_create(&threads[1], NULL, &read, &sockfd)) {
+    if (pthread_create(&threads[2], NULL, &read, &sockfd)) {
         cout << "Error in thread creation of read()" << endl;
 	    close(sockfd);
 	    exit(1);
