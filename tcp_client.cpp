@@ -30,11 +30,19 @@ int timer_thread_on(1);
 void * heartBeat(void * arg)
 {
 	int sockfd = *(int *) arg;
+	cout << "start heartBeat()" << endl;
+	cout.flush();
 	timer_thread_on = 1;
 	while (timer_thread_on ) {
 		int ret = send(sockfd, "heartBeat\n", 10, 0);
-		usleep(15 * 1000000);
+		//usleep(15 * 1000000);
+		for (int idx = 0; idx < 15; idx++ ) {
+			if (timer_thread_on == 0) break;
+			usleep (1000000);
+		}
 	}
+	cout << "Leaving heartBeat()." << endl;
+	cout.flush();
 	return (void*)nullptr;	
 }
 
@@ -42,6 +50,9 @@ void * read_func (void * arg)
 {
 	int sockfd = *(int *) arg;
 	char buffer[MAX];
+
+	cout << "start read_func()" << endl;
+	cout.flush();
 
 	read_thread_on = 1;
 	while (read_thread_on) {
@@ -58,20 +69,25 @@ void * read_func (void * arg)
 				idx++;
 			}
 
-			if ((strncmp(buffer, "close", 4)) == 0) {
-				printf("Client Close...\n");
+			if ((strncmp(buffer, "close", 5)) == 0) {
+				write_thread_on = 0;
 				read_thread_on = 0;
+				timer_thread_on = 0;
+				//printf("Client Close...\n");
 				break;
 			} else
 			if ((strncmp(buffer, "exit", 4)) == 0) {
-				printf("Client Exit...\n");
+				write_thread_on = 0;
 				read_thread_on = 0;
+				timer_thread_on = 0;
+				//printf("Client Exit...\n");
 				break;
 			}
 		}
-		//usleep(1000000);
 		sleep(.5);
 	}
+	cout << "Leaving read_func()." << endl;
+	cout.flush();
 	//pthread_exit(NULL);
 	return (void*) nullptr;
 }
@@ -81,6 +97,9 @@ void * write_func(void * arg)
 	int sockfd = *(int *) arg;
 	char buffer[MAX];
 	
+	cout << "start write_func()" << endl;
+	cout.flush();
+
 	write_thread_on = 1;
 	while (write_thread_on) {
 		int n(0);
@@ -104,22 +123,25 @@ void * write_func(void * arg)
 
 		while( buffer[idx] ) {
 			char c = buffer[idx];
-			//putchar(tolower(c));
 			tolower(c);
 			idx++;
 		}
 
-		if ((strncmp(buffer, "close", 4)) == 0) {
+		if ((strncmp(buffer, "close", 5)) == 0) {
 			write_thread_on = 0;
+			read_thread_on = 0;
+			timer_thread_on = 0;
 			break;
 		} else
 		if ((strncmp(buffer, "exit", 4)) == 0) {
 			write_thread_on = 0;
 			read_thread_on = 0;
+			timer_thread_on = 0;
  			break;    // exit the current thread
 		}
-		//usleep(1000000);
 	}
+	cout << "Leaving write_func()." << endl;
+	cout.flush();
 
 	//pthread_exit(NULL);
 	return (void*) nullptr;
@@ -185,7 +207,7 @@ int main()
 	while (!timer_thread_on) {
 		sleep(.5);
 	}
-	cout << "----- start timer -----" << endl;
+//	cout << "----- start timer -----" << endl;
 	cout << "heartBeat() thread created" << endl;
 
 	while (!read_thread_on) {
@@ -199,9 +221,9 @@ int main()
 	cout << "write_func() thread created" << endl;	
 	
 	while (read_thread_on || write_thread_on || timer_thread_on) {
-		timer_thread_on = 0;
 		sleep(1);
 	}
+	//sleep(1);
 
 	// close the socket
 	close(sockfd);
