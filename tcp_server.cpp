@@ -37,7 +37,8 @@ int main(int argc , char *argv[])
 	fd_set readfds;
 		
 	//a message
-	const char * message = "ECHO Daemon v1.0 \r\n";
+	//const char * message = "ECHO Daemon v1.0 \r\n";
+	const char * message = "Test Output \r\n";
 	
 	//initialise all client_socket[] to 0 so not checked
 	for (i = 0; i < max_clients; i++) {
@@ -63,16 +64,14 @@ int main(int argc , char *argv[])
 	address.sin_port = htons( PORT );
 		
 	//bind the socket to localhost port 8888
-	if (bind(master_socket, (struct sockaddr *)&address, sizeof(address))<0)
-	{
+	if (bind(master_socket, (struct sockaddr *)&address, sizeof(address))<0) {
 		perror("bind failed");
 		exit(EXIT_FAILURE);
 	}
 	printf("Listener on port %d \n", PORT);
 		
 	//try to specify maximum of 3 pending connections for the master socket
-	if (listen(master_socket, 3) < 0)
-	{
+	if (listen(master_socket, 3) < 0) {
 		perror("listen");
 		exit(EXIT_FAILURE);
 	}
@@ -81,8 +80,7 @@ int main(int argc , char *argv[])
 	addrlen = sizeof(address);
 	puts("Waiting for connections ...");
 		
-	while(TRUE)
-	{
+	while(TRUE) {
 		//clear the socket set
 		FD_ZERO(&readfds);
 	
@@ -91,8 +89,7 @@ int main(int argc , char *argv[])
 		max_sd = master_socket;
 			
 		//add child sockets to set
-		for ( i = 0 ; i < max_clients ; i++)
-		{
+		for ( i = 0 ; i < max_clients ; i++) {
 			//socket descriptor
 			sd = client_socket[i];
 				
@@ -109,15 +106,13 @@ int main(int argc , char *argv[])
 		//so wait indefinitely
 		activity = select( max_sd + 1 , &readfds , NULL , NULL , NULL);
 	
-		if ((activity < 0) && (errno!=EINTR))
-		{
+		if ((activity < 0) && (errno!=EINTR)) {
 			printf("select error");
 		}
 			
 		//If something happened on the master socket ,
 		//then its an incoming connection
-		if (FD_ISSET(master_socket, &readfds))
-		{
+		if (FD_ISSET(master_socket, &readfds)) {
 			if ((new_socket = accept(master_socket,
 					(struct sockaddr *)&address, (socklen_t*)&addrlen))<0)
 			{
@@ -151,21 +146,18 @@ int main(int argc , char *argv[])
 		}
 			
 		//else its some IO operation on some other socket
-		for (i = 0; i < max_clients; i++)
-		{
+		for (i = 0; i < max_clients; i++) {
 			sd = client_socket[i];
 				
-			if (FD_ISSET( sd , &readfds))
-			{
+			if (FD_ISSET( sd , &readfds)) {
 				//Check if it was for closing , and also read the
 				//incoming message
-				if ((valread = read( sd , buffer, 1024)) == 0)
-				{
+				bzero(buffer, sizeof(buffer));
+				if ((valread = read( sd , buffer, 1024)) == 0) {
 					//Somebody disconnected , get his details and print
-					getpeername(sd , (struct sockaddr*)&address , \
-						(socklen_t*)&addrlen);
+					getpeername(sd , (struct sockaddr*)&address , (socklen_t*)&addrlen);
 					printf("Host disconnected , ip %s , port %d \n" ,
-						inet_ntoa(address.sin_addr) , ntohs(address.sin_port));
+					inet_ntoa(address.sin_addr) , ntohs(address.sin_port));
 						
 					//Close the socket and mark as 0 in list for reuse
 					close( sd );
@@ -173,57 +165,47 @@ int main(int argc , char *argv[])
 				}
 					
 				//Echo back the message that came in
-				else
-				{
-					//set the string terminating NULL byte on the end
-					//of the data read
-					buffer[valread] = '\0';
-					//send(sd , buffer , strlen(buffer) , 0 );
-					
-					cout << "buffer from client: " << buffer;
-					
+				else {
+					cout << "buffer sd: " << sd << " from client: " << buffer;
+
 					// ----------
 					// rtr - added: On receipt of a "Close" close/disconnect this active socket.
 					// turn buffer to lower case...
-					string msg(buffer);
-					transform(msg.begin(), msg.end(), msg.begin(), ::tolower);
-					if (msg.compare(0, msg.length() - 1, "close") == 0) {
-						printf("Host disconnected , ip %s , port %d \n" ,
+					
+					int idx(0);
+					while( buffer[idx] ) {
+                                		char c = buffer[idx];
+                                		//putchar(tolower(c));
+                                		tolower(c);
+                                		idx++;
+					}
+					
+					if ((strncmp(buffer, "close", 4)) == 0) {
+						printf("Close. Host disconnected , ip %s , port %d \n" ,
 							inet_ntoa(address.sin_addr) , ntohs(address.sin_port));
 						//Close the socket and mark as 0 in list for reuse
+						send(sd, buffer, strlen(buffer), 0 );
 						close( sd );
 						client_socket[i] = 0;
-					} else if (msg.compare(0, msg.length() - 1, "exit") == 0) {
-						printf("Host disconnected , ip %s , port %d \n" ,
+						break;
+					} else if ((strncmp(buffer, "exit", 4)) == 0) {
+						printf("Exit. Host disconnected , ip %s , port %d \n" ,
 							inet_ntoa(address.sin_addr) , ntohs(address.sin_port));
-						//Close the socket and mark as 0 in list for reuse
-						cout << "send message to client of fd: " << sd;
-						send(sd, msg.c_str(), msg.length(), 0 );
-						close( sd );
-						client_socket[i] = 0;
-						//Close socket(s) and mark as 0 in list
-					return 1;
-#if 0
+						
 						cout << "exiting all ..." << endl;
 						for (int idx = 0; idx < max_clients; idx++) {
 							int _sd = client_socket[idx];
 							//cout << "idx: " << idx << " _sd: " << _sd << endl;
 							if (_sd) {
-								//buffer[valread] = '\0';
 								// send to other clients, let each close their socket
-								cout << "send msg to _sd: " << _sd << endl;
-								send(_sd , msg.c_str(), msg.length(), 0 );
+								cout << "send to _sd: " << _sd << " buffer: " << buffer;
+								send(_sd , buffer, strlen(buffer), 0 );
 								close( _sd );	
 								client_socket[idx] = 0;
 							}
 						}
-				//return 1;
-#endif
-					} else {
-						buffer[valread] = '\0';
-						send(sd , buffer , strlen(buffer) , 0 );
-					}				
-					// ----------
+						return 1;
+					}
 				}
 			}
 		}

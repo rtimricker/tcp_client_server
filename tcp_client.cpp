@@ -7,6 +7,7 @@
 #include <errno.h>
 #include <unistd.h> //close
 #include <arpa/inet.h> //close
+#include <ctype.h>
 
 #include <iostream>
 #include <string>
@@ -22,122 +23,104 @@ using namespace std;
 #define PORT 5000 
 #define SA struct sockaddr
 
-/*
-//#include <stdio.h>
-//#include <string.h> //strlen
-//#include <stdlib.h>
-#include <errno.h>
-#include <unistd.h> //close
-#include <arpa/inet.h> //close
-#include <sys/types.h>
-#include <sys/socket.h>
-#include <netinet/in.h>
-#include <sys/time.h> //FD_SET, FD_ISSET, FD_ZERO macros
-*/
-
 int read_thread_on(1);
 int write_thread_on(1);
+int timer_thread_on(1);
 
-struct kick;		// prototype
-struct kick {
-	kick()
-	{
-	}
-	char buff[MAX];
-	int port;
-	int sockfd;
-};
-
-#if 1
 void * heartBeat(void * arg)
 {
 	int sockfd = *(int *) arg;
-	while (write_thread_on || read_thread_on) {
-		int ret = write(sockfd, "heartBeat\n", 10);
-		cout << "write: heartBeat to sockfd: " << sockfd << endl;
-
-		//cout << "==> in thread loop, write: [" << msg.c_str() << "] " << "ret: " << ret << endl;
-		cout << "==> in thread loop, write: [" << heartBeat << "] sockfd: " << sockfd << " ret: " << ret << endl;
-
-		cout.flush();
+	timer_thread_on = 1;
+	while (timer_thread_on ) {
+		int ret = send(sockfd, "heartBeat\n", 10, 0);
 		usleep(15 * 1000000);
 	}
 	return (void*)nullptr;	
 }
-#endif
 
-void * read (void * arg)
+void * read_func (void * arg)
 {
 	int sockfd = *(int *) arg;
-	char buff[MAX];
-#if 1
+	char buffer[MAX];
+
 	read_thread_on = 1;
 	while (read_thread_on) {
-		bzero(buff, sizeof(buff));
-		read(sockfd, buff, sizeof(buff));
-		string msg(buff);
-		cout << "...From Server : " << msg.c_str() << "sockfd: " << sockfd;
-		if ((strncmp(buff, "exit", 4)) == 0) {
-			printf("Client Exit...\n");
-			read_thread_on = 0;
+		bzero(buffer, sizeof(buffer));
+		int retval = read(sockfd, buffer, sizeof(buffer));
+//		cout << "retval: " << retval << endl;
+		if (retval) {
+
+			int idx(0);
+                	while( buffer[idx] ) {
+				char c = buffer[idx];
+				//putchar(tolower(c));
+				tolower(c);
+				idx++;
+			}
+
+			if ((strncmp(buffer, "close", 4)) == 0) {
+				printf("Client Close...\n");
+				read_thread_on = 0;
+				break;
+			} else
+			if ((strncmp(buffer, "exit", 4)) == 0) {
+				printf("Client Exit...\n");
+				read_thread_on = 0;
+				break;
+			}
 		}
+		//usleep(1000000);
+		sleep(.5);
 	}
-#endif
-	return (void*) nullptr;
+	//pthread_exit(NULL);
+	return (void*) nullptr;
 }
-//void func(int sockfd)
-void * write(void * arg)
+
+void * write_func(void * arg)
 {
 	int sockfd = *(int *) arg;
-	char buff[MAX];
-	int n;
+	char buffer[MAX];
 	
 	write_thread_on = 1;
 	while (write_thread_on) {
-		bzero(buff, sizeof(buff));
+		int n(0);
 		printf("Enter the string : ");
-		n = 0;
-		while ((buff[n++] = getchar()) != '\n')
+		bzero(buffer, sizeof(buffer));
+		while ((buffer[n++] = getchar()) != '\n')
 			;
-		cout << "n: " << n << " strlen(buff): " << strlen(buff) << endl;
-		string msg(buff);
-		write(sockfd, msg.c_str(), msg.length());
-		//write(sockfd, buff, sizeof(buff));
-		cout << "write: " << buff << " to sockfd: " << sockfd << " length: " << strlen(buff) <<  endl;
+		if (buffer[0] == '\n') continue;
+
+		//write(sockfd, buffer, strlen(buffer));
+		send(sockfd, buffer, strlen(buffer), 0);
+		//cout << " to sockfd: " << sockfd << " length: " << strlen(buffer) << " write: " << buffer;
 
 		// ----------
 		// rtr - added 
 		// "Close" the current active connection
 		// "Exit" the app
 		//
-//		string msg(buff);
-//		cout << "wrote to server: " << msg.c_str();
-		transform(msg.begin(), msg.end(), msg.begin(), ::tolower);
-		if (msg.compare(0, msg.length() - 1, "close") == 0) {
-			cout << "msg: " << msg.c_str();
+
+		int idx(0);
+
+		while( buffer[idx] ) {
+			char c = buffer[idx];
+			//putchar(tolower(c));
+			tolower(c);
+			idx++;
+		}
+
+		if ((strncmp(buffer, "close", 4)) == 0) {
 			write_thread_on = 0;
 			break;
 		} else
-		if (msg.compare(0, msg.length() - 1, "exit") == 0) {
-			cout << "msg: " << msg.c_str() << endl;			
+		if ((strncmp(buffer, "exit", 4)) == 0) {
 			write_thread_on = 0;
+			read_thread_on = 0;
  			break;    // exit the current thread
 		}
-		//} else {
-		//
-		// ----------
-		//	bzero(buff, sizeof(buff));
-		//	read(sockfd, buff, sizeof(buff));
-		//	printf("From Server : %s", buff);
-		//	if ((strncmp(buff, "exit", 4)) == 0) {
-		//		printf("Client Exit...\n");
-		//		break;
-		//	}
-		//}
+		//usleep(1000000);
 	}
 
-	cout << "thread thread_on: " << write_thread_on << endl;
-	cout.flush();
 	//pthread_exit(NULL);
 	return (void*) nullptr;
 }
@@ -172,86 +155,55 @@ int main()
 	
 	pthread_t threads[3];
 	int i(0);
-#if 1
-	// -----
-	// rtr - start timer thread
-	cout << "----- start timer -----" << endl;
-	cout.flush();
-//	struct kick _kick;
-//	_kick.sockfd = sockfd;
-//	_kick.port = PORT;
-
-
-    if (pthread_create(&threads[0], NULL, &heartBeat, &sockfd)) {
-//    strncpy(_kick.buff, "heartBeat\n", 10);
-//    if (pthread_create(&threads[0], NULL, &heartBeat, &_kick)) {
-        cout << "Error in thread creation of heartBeat, sockfd: " << sockfd << endl;
-	    close(sockfd);
-	    exit(1);
-    }
-	cout << "heartBeat thread created" << endl;
-	cout.flush();
-//sleep(5000000);
-
-	// -----
-#endif
 	
-	// function for chat
-	//write(sockfd);
-#if 1
 	// ----------
 	// rtr - have keyboard input in background to allow for server talking to client.
 	//
-    if (pthread_create(&threads[1], NULL, &write, &sockfd)) {
-        cout << "Error in thread creation of write(), sockfd: " << sockfd << endl;
-	    close(sockfd);
-	    exit(1);
-    }
-	//sleep(1);
-	while (!write_thread_on) {
-		sleep(1);
+	if (pthread_create(&threads[0], NULL, &write_func, &sockfd)) {
+        	cout << "Error in thread creation of write(), sockfd: " << sockfd << endl;
+		close(sockfd);
+		exit(1);
 	}
-	
-	cout << "write() thread created" << endl;	
-	cout << "wait for exiting write_thread_on: " << write_thread_on << endl;
-	cout.flush();
 
-
-	while (write_thread_on) {
-		sleep(1);
-	}
 	// ----------
-#endif
 
-#if 0
 	// ----------
-	// rtr - have keyboard input in background
+	// rtr - read from server...
 	//
-    if (pthread_create(&threads[2], NULL, &read, &sockfd)) {
-        cout << "Error in thread creation of read()" << endl;
-	    close(sockfd);
-	    exit(1);
-    }
-	cout << "read() thread created" << endl;	
-	cout << "wait for exiting read_thread_on: " << read_thread_on << endl;
-	cout.flush();
+	if (pthread_create(&threads[1], NULL, &read_func, &sockfd)) {
+        	cout << "Error in thread creation of read_func()" << endl;
+		close(sockfd);
+		exit(1);
+	}
+
+	if (pthread_create(&threads[2], NULL, &heartBeat, &sockfd)) {
+		cout << "Error in thread creation of heartBeat, sockfd: " << sockfd << endl;
+		close(sockfd);
+		exit(1);
+	}
+
+	while (!timer_thread_on) {
+		sleep(.5);
+	}
+	cout << "----- start timer -----" << endl;
+	cout << "heartBeat() thread created" << endl;
 
 	while (!read_thread_on) {
-		sleep(1);
+		sleep(.5);
 	}
+	cout << "read_func() thread created" << endl;	
+
+	while (!write_thread_on) {
+		sleep(.5);
+	}
+	cout << "write_func() thread created" << endl;	
 	
-	while (read_thread_on) {
+	while (read_thread_on || write_thread_on || timer_thread_on) {
+		timer_thread_on = 0;
 		sleep(1);
 	}
-	// ----------
-#endif
 
 	// close the socket
 	close(sockfd);
-
-	//	write_thread_on = 0;
-	//while (write_thread_on) {
-	//	sleep(1);
-	//}
 }
 
