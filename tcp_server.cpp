@@ -10,6 +10,7 @@
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <sys/time.h> //FD_SET, FD_ISSET, FD_ZERO macros
+#include <time.h>
 	
 #include <iostream>
 #include <string>
@@ -26,7 +27,7 @@ using namespace std;
 int main(int argc , char *argv[])
 {
 	int opt = TRUE;
-	int master_socket , addrlen , new_socket , client_socket[30] ,
+	int master_socket , addrlen , new_socket , client_socket[30] , client_timeout[30],
 		max_clients = 30 , activity, i , valread , sd;
 	int max_sd;
 	struct sockaddr_in address;
@@ -40,10 +41,9 @@ int main(int argc , char *argv[])
 	//const char * message = "ECHO Daemon v1.0 \r\n";
 	const char * message = "Test Output \r\n";
 	
-	//initialise all client_socket[] to 0 so not checked
-	for (i = 0; i < max_clients; i++) {
-		client_socket[i] = 0;
-	}
+	// initialise all client_socket[] to 0 so not checked
+	memset(client_socket, 0, sizeof(client_socket));
+	memset(client_timeout, 0, sizeof(client_timeout));
 		
 	//create a master socket
 	if( (master_socket = socket(AF_INET , SOCK_STREAM , 0)) == 0) {
@@ -102,10 +102,34 @@ int main(int argc , char *argv[])
 				max_sd = sd;
 		}
 	
-		//wait for an activity on one of the sockets , timeout is NULL ,
-		//so wait indefinitely
-		activity = select( max_sd + 1 , &readfds , NULL , NULL , NULL);
+		// wait for an activity on one of the sockets
+
+		timeval timeout;
+		timeout.tv_sec = 1; 
+    	timeout.tv_usec = 0; 
+		activity = select( max_sd + 1 , &readfds , NULL , NULL , (timeval*)&timeout);
 	
+		if (activity == 0) {
+			// a timeout occurer on socket
+//			printf("timeout occured on server\n");
+			// check time delay of any particular socket,
+			// if any at 30 or more seconds, disconnect that socket
+
+			for (int idx = 0; idx < max_clients; ++idx) {
+				if (client_timeout[idx] >= 30 && client_socket[idx]) {
+					printf ("server: socket %d at index %d timed out at %d seconds, closing\n", client_socket[idx], idx, client_timeout[idx]);
+					
+					send(client_socket[idx], "exit\n", 5, 0);
+					close (client_socket[idx]);
+					usleep(1000);
+					client_timeout[idx] = 0;
+					client_socket[idx] = 0;
+				} else {
+					++client_timeout[idx];
+				}
+			}
+		}
+
 		if ((activity < 0) && (errno!=EINTR)) {
 			printf("select error");
 		}
@@ -132,11 +156,9 @@ int main(int argc , char *argv[])
 			puts("Welcome message sent successfully");
 				
 			//add new socket to array of sockets
-			for (i = 0; i < max_clients; i++)
-			{
+			for (i = 0; i < max_clients; i++) {
 				//if position is empty
-				if( client_socket[i] == 0 )
-				{
+				if( client_socket[i] == 0 ) {
 					client_socket[i] = new_socket;
 					printf("Adding to list of sockets as %d\n" , i);
 						
