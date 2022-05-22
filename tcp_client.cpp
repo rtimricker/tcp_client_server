@@ -30,8 +30,8 @@ int timer_thread_on(1);
 void * heartBeat(void * arg)
 {
 	int sockfd = *(int *) arg;
-	cout << "start heartBeat()" << endl;
-	cout.flush();
+//	cout << "start heartBeat()" << endl;
+//	cout.flush();
 	timer_thread_on = 1;
 	while (timer_thread_on ) {
 		int ret = send(sockfd, "heartBeat\n", 10, 0);
@@ -49,11 +49,11 @@ void * heartBeat(void * arg)
 void * read_func (void * arg)
 {
 	int sockfd = *(int *) arg;
-	printf ("start, use sock: %d\n", sockfd);
+//	printf ("start, use sock: %d\n", sockfd);
 	char buffer[MAX];
 
-	cout << "start read_func()" << endl;
-	cout.flush();
+//	cout << "start read_func()" << endl;
+//	cout.flush();
 
 	read_thread_on = 1;
 	while (read_thread_on) {
@@ -97,12 +97,12 @@ void * write_func(void * arg)
 	int sockfd = *(int *) arg;
 	char buffer[MAX];
 	
-	cout << "start write_func()" << endl;
-	cout.flush();
+//	cout << "start write_func()" << endl;
+//	cout.flush();
 
 	write_thread_on = 1;
 	while (write_thread_on) {
-		int n(0);
+		int n = 0;
 		printf("Enter the string : ");
 		bzero(buffer, sizeof(buffer));
 		while ((buffer[n++] = getchar()) != '\n')
@@ -208,17 +208,17 @@ int main()
 		sleep(.5);
 	}
 //	cout << "----- start timer -----" << endl;
-	cout << "heartBeat() thread created" << endl;
+//	cout << "heartBeat() thread created" << endl;
 
 	while (!read_thread_on) {
 		sleep(.5);
 	}
-	cout << "read_func() thread created" << endl;	
+//	cout << "read_func() thread created" << endl;	
 
 	while (!write_thread_on) {
 		sleep(.5);
 	}
-	cout << "write_func() thread created" << endl;	
+//	cout << "write_func() thread created" << endl;	
 	
 	while (read_thread_on || write_thread_on || timer_thread_on) {
 		sleep(1);

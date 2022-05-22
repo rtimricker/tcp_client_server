@@ -27,7 +27,7 @@ using namespace std;
 int main(int argc , char *argv[])
 {
 	int opt = TRUE;
-	int master_socket , addrlen , new_socket , client_socket[30] , client_timeout[30],
+	int master_socket , addrlen , new_socket , client_socket[30] , client_timeout[30], client_check[30],
 		max_clients = 30 , activity, i , valread;
 	int max_sd;
 	struct sockaddr_in address;
@@ -44,6 +44,7 @@ int main(int argc , char *argv[])
 	// initialise 
 	bzero(client_socket, sizeof(client_socket));
 	bzero(client_timeout, sizeof(client_timeout));
+	bzero(client_check, sizeof(client_check));
 		
 	//create a master socket
 	if( (master_socket = socket(AF_INET , SOCK_STREAM , 0)) == 0) {
@@ -177,8 +178,6 @@ int main(int argc , char *argv[])
 			
 		// else its some IO operation on some other socket
 		for (i = 0; i < max_clients; i++) {
-			if (client_socket[i] == 0) continue;
-//			sd = client_socket[i];
 				
 //			printf ("FD_ISSET: %d\n", FD_ISSET(client_socket[i], &readfds));
 
@@ -201,7 +200,6 @@ int main(int argc , char *argv[])
 				// Echo back the message that came in
 				else {
 					cout << "buffer sd: " << client_socket[i] << " from client: " << buffer;
-//					client_timeout[i] = 0;
 
 					// ----------
 					// rtr - added: On receipt of a "Close" close/disconnect this active socket.
@@ -213,6 +211,24 @@ int main(int argc , char *argv[])
 						tolower(c);
                         idx++;
 					}
+
+					if (strncmp(buffer, "heartBeat", 4) != 0) {
+						++client_check[i];
+						printf ("%d messages received.\n", client_check[i]);
+						if (client_check[i] >= 10) {
+							printf("Close. Host disconnected , ip %s , port %d \n" ,
+									inet_ntoa(address.sin_addr) , ntohs(address.sin_port));
+							// Close the socket and mark as 0 in list for reuse
+							send(client_socket[i], "close", 5, 0 );
+							close( client_socket[i] );
+							client_socket[i] = 0;
+							client_timeout[i] = 0;
+							printf ("Connection considered complete. Closing this connection.\n");
+							client_check[i] = 0;
+							continue;
+						}
+					}
+
 					
 					if (strncmp(buffer, "close", 4) == 0) {
 						printf("Close. Host disconnected , ip %s , port %d \n" ,
