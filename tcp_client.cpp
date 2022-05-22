@@ -49,6 +49,7 @@ void * heartBeat(void * arg)
 void * read_func (void * arg)
 {
 	int sockfd = *(int *) arg;
+	printf ("start, use sock: %d\n", sockfd);
 	char buffer[MAX];
 
 	cout << "start read_func()" << endl;
@@ -62,9 +63,8 @@ void * read_func (void * arg)
 		if (retval) {
 
 			int idx(0);
-                	while( buffer[idx] ) {
+            while( buffer[idx] ) {
 				char c = buffer[idx];
-				//putchar(tolower(c));
 				tolower(c);
 				idx++;
 			}
@@ -172,11 +172,11 @@ int main()
 		printf("connection with the server failed...\n");
 		exit(0);
 	} else {
-		printf("connected to the server..\n");
+		printf("connected to the server... sockfd: %d\n", sockfd);
 	}
 	
 	pthread_t threads[3];
-	int i(0);
+	int i = 0;
 	
 	// ----------
 	// rtr - have keyboard input in background to allow for server talking to client.
